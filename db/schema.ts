@@ -1,0 +1,4 @@
+import {sqliteTable,text,integer,primaryKey,uniqueIndex} from 'drizzle-orm/sqlite-core';
+export const sessions=sqliteTable('sessions',{id:text('id').primaryKey(),code:text('code').notNull(),question:integer('question').notNull().default(0),phase:text('phase').notNull().default('waiting'),created:integer('created').notNull(),revision:integer('revision').notNull().default(0)},t=>[uniqueIndex('sessions_code').on(t.code)]);
+export const votes=sqliteTable('votes',{session:text('session').notNull().references(()=>sessions.id),question:integer('question').notNull(),participant:text('participant').notNull(),choice:integer('choice').notNull(),created:integer('created').notNull()},t=>[primaryKey({columns:[t.session,t.question,t.participant]})]);
+export const loginAttempts=sqliteTable('login_attempts',{key:text('key').primaryKey(),count:integer('count').notNull().default(0),expires:integer('expires').notNull()});

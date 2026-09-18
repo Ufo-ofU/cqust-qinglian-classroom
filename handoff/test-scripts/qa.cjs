@@ -1,0 +1,33 @@
+const {chromium}=require('playwright');
+const fs=require('fs');
+const path=require('path');
+(async()=>{
+ const browser=await chromium.launch({channel:'msedge',headless:true});
+ const ctx=await browser.newContext({viewport:{width:1440,height:1000}});
+ const page=await ctx.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://localhost:5173/');await page.waitForSelector('#class-code');
+ await page.screenshot({path:'work/student-entry.png',fullPage:true});
+ await page.setViewportSize({width:390,height:844});await page.screenshot({path:'work/student-mobile.png',fullPage:true});
+ const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);if(overflow)throw Error('Mobile horizontal overflow');
+ const secret=fs.readFileSync(path.join(process.argv[2],'.dev.vars'),'utf8').match(/TEACHER_KEY=(.+)/)[1].trim();
+ await page.setViewportSize({width:1440,height:1000});await page.goto('http://localhost:5173/teacher');await page.waitForTimeout(1800);await page.getByLabel('教师口令').fill(secret);await page.getByRole('button',{name:'进入教师控制台'}).click();await page.getByRole('button',{name:'创建课堂',exact:true}).waitFor();await page.getByRole('button',{name:'创建课堂',exact:true}).click();await page.getByRole('button',{name:'开放本题',exact:true}).waitFor();
+ let r=await ctx.request.get('http://localhost:5173/api/classroom/teacher');let data=await r.json();const code=data.session.code;
+ await page.screenshot({path:'work/teacher-ready.png',fullPage:true});
+ const student=await browser.newContext({viewport:{width:390,height:844}});const sp=await student.newPage();sp.on('pageerror',e=>errors.push(e.message));await sp.goto('http://localhost:5173/?code='+code);await sp.getByText('已进入课堂，等老师开题。').waitFor();
+ await page.getByRole('button',{name:'开放本题',exact:true}).click();await sp.getByRole('radio').first().waitFor({timeout:20000});await sp.getByRole('radio').nth(2).click();await sp.getByRole('button',{name:'确认提交 C'}).click();await sp.getByText('已提交，选择 C').waitFor();await sp.screenshot({path:'work/student-voted.png',fullPage:true});
+ const post=(context,action,body)=>context.request.post('http://localhost:5173/api/classroom/'+action,{headers:{Origin:'http://localhost:5173'},data:body});
+ r=await post(student,'vote',{code,question:0,choice:0});let duplicate=await r.json();if(duplicate.choice!==2)throw Error('duplicate overwrote vote');
+ r=await ctx.request.get('http://localhost:5173/api/classroom/teacher');data=await r.json();if(data.session.total!==1)throw Error('wrong total');
+ r=await student.request.get('http://localhost:5173/api/classroom/state?code='+code);const hidden=await r.json();if(hidden.session.correct!==undefined||hidden.session.counts!==undefined)throw Error('answer/result leak before reveal');
+ r=await post(student,'control',{code,command:'close',revision:1});if(r.status()!==401)throw Error('unauth control permitted');
+ await page.getByRole('button',{name:'结束作答',exact:true}).click();await page.getByRole('button',{name:'公布结果与解析'}).waitFor();
+ const student2=await browser.newContext();await post(student2,'join',{code});r=await post(student2,'vote',{code,question:0,choice:0});if(r.status()!==409)throw Error('closed vote accepted');
+ await page.getByRole('button',{name:'公布结果与解析'}).click();await sp.getByText('老师的解析').waitFor({timeout:20000});await sp.screenshot({path:'work/student-result.png',fullPage:true});
+ const screen=await ctx.newPage();await screen.goto('http://localhost:5173/screen?code='+code);await screen.getByText('老师的解析').waitFor();await screen.screenshot({path:'work/screen-result.png',fullPage:true});
+ await page.screenshot({path:'work/teacher-results.png',fullPage:true});
+ await sp.reload();await sp.getByText('老师的解析').waitFor();r=await student.request.get('http://localhost:5173/api/classroom/mine?code='+code);if((await r.json()).choice!==2)throw Error('refresh lost vote');
+ await page.getByRole('button',{name:'准备下一题'}).click();await page.getByRole('button',{name:'开放本题',exact:true}).waitFor();await page.getByRole('button',{name:'开放本题',exact:true}).click();await sp.getByRole('radio').first().waitFor({timeout:20000});
+ if(errors.length)throw Error(errors.join('\n'));fs.writeFileSync('work/qa-result.json',JSON.stringify({code,checks:['desktop/mobile render','teacher login','create classroom','student join','open and submit','duplicate idempotency','answers hidden','teacher authorization','closed vote rejection','reveal broadcast','reload persistence','advance question'],errors},null,2));
+ console.log('PASS: 12 interaction checks; classroom '+code);await browser.close();
+})().catch(e=>{console.error(e);process.exit(1)});
+

@@ -1,0 +1,18 @@
+{
+  "code": "189452",
+  "checks": [
+    "desktop/mobile render",
+    "teacher login",
+    "create classroom",
+    "student join",
+    "open and submit",
+    "duplicate idempotency",
+    "answers hidden",
+    "teacher authorization",
+    "closed vote rejection",
+    "reveal broadcast",
+    "reload persistence",
+    "advance question"
+  ],
+  "errors": []
+}

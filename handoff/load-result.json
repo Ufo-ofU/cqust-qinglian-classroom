@@ -1,0 +1,16 @@
+{
+  "environment": "local development worker and local D1; not production or campus network",
+  "requests": 4700,
+  "concurrency": 50,
+  "accepted": 4700,
+  "errors": 0,
+  "elapsedMs": 39788,
+  "p95Ms": 505,
+  "duplicateRetries": 100,
+  "totalAfterRetries": 4700,
+  "counts": [
+    1567,
+    1567,
+    1566
+  ]
+}
