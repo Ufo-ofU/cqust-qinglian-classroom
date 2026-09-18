@@ -1,2 +1,2 @@
-import Classroom from "./classroom";
-export default function Page(){ return <Classroom mode="student"/>; }
+import Classroom from "../classroom";
+export default function Page(){ return <Classroom mode="screen"/>; }
